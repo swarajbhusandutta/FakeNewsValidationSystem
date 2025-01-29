@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake News Validation</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Fake News Validation System</h1>
+
+        <!-- Dropdown for URL or Content -->
+        <form id="inputForm">
+            <label for="inputType">Select Input Type:</label>
+            <select id="inputType" onchange="toggleInputBox()">
+                <option value="url">URL</option>
+                <option value="content">Content</option>
+            </select>
+
+            <!-- Input box (dynamically updates) -->
+            <div id="inputContainer">
+                <label for="inputData">Enter URL:</label>
+                <input type="text" id="inputData" placeholder="Enter a URL">
+            </div>
+
+            <button type="submit">Validate</button>
+        </form>
+
+        <!-- Display results -->
+        <div id="results">
+            <h2>Results</h2>
+            <div id="adversarialDetection"></div>
+            <div id="scrapedContent"></div>
+            <div id="searchResults"></div>
+            <div id="validationResults"></div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle input box based on selection
+        function toggleInputBox() {
+            const inputType = document.getElementById('inputType').value;
+            const inputContainer = document.getElementById('inputContainer');
+            const label = inputContainer.querySelector('label');
+            const input = inputContainer.querySelector('input');
+
+            if (inputType === "url") {
+                label.textContent = "Enter URL:";
+                input.placeholder = "Enter a URL";
+            } else {
+                label.textContent = "Enter Content:";
+                input.placeholder = "Enter news content";
+            }
+        }
+
+        // Handle form submission
+        const form = document.getElementById('inputForm');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const inputType = document.getElementById('inputType').value;
+            const inputData = document.getElementById('inputData').value;
+
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: inputType, data: inputData }),
+            });
+
+            const resultsDiv = document.getElementById('results');
+            const data = await response.json();
+
+            if (response.status === 400) {
+                resultsDiv.innerHTML = `<h3>Adversarial Input Detected</h3><p>${data.flags.join(', ')}</p>`;
+            } else if (response.status === 200) {
+                resultsDiv.innerHTML = `
+                    <h3>Adversarial Detection</h3>
+                    <p>${data.adversarial_flag ? "Adversarial Input Detected" : "No Adversarial Patterns Detected"}</p>
+                    <h3>Scraped Content</h3>
+                    <p>${data.content}</p>
+                    <h3>Search Results</h3>
+                    <ul>${Object.entries(data.search_results)
+                        .map(([engine, url]) => `<li>${engine}: <a href="${url}" target="_blank">${url}</a></li>`)
+                        .join('')}</ul>
+                    <h3>Fake News Validation</h3>
+                    <p>Best Model: ${data.best_model}</p>
+                    <p>Fake News Probability: ${(data.predictions[data.best_model] * 100).toFixed(2)}%</p>
+                    <p>Reputation Score: ${data.reputation_score}</p>
+                `;
+            } else {
+                resultsDiv.innerHTML = `<h3>Error</h3><p>${data.error}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
